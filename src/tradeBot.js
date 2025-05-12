@@ -51,18 +51,24 @@ function startWebhookServer(app) {
       let positionFilled = false;
       let positionSize = 0;
 
-      while (!positionFilled) {
-        const orderStatusRes = await client.getOrder({ symbol, orderId });
-        positionSize = parseFloat(orderStatusRes.result.size);
 
-        if (positionSize > 0) {
-          positionFilled = true;
-          console.log('Order filled:', positionSize);
-        } else {
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for 5 seconds before checking again
-        }
-      }
+while (!positionFilled) {
+  const res = await client.getPositionList({
+    category: 'linear',
+    symbol: 'BTCUSDT'
+  });
 
+  const position = res.result.list[0];
+  const size = position ? parseFloat(position.size) : 0;
+
+  if (size > 0) {
+    positionFilled = true;
+    console.log('✅ Position is open (order filled)');
+  } else {
+    console.log('⏳ Waiting for position to open...');
+    await new Promise(resolve => setTimeout(resolve, 5000)); // wait 5 seconds
+  }
+}
       // Step 3: Track TP and SL levels
       await trackTakeProfit(symbol, side, entryPrice, tp1, tp2, tp3, sl);
 
