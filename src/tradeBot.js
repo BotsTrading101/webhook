@@ -71,6 +71,49 @@ function startWebhookServer(app) {
       res.status(500).send('Error processing trade.');
     }
   });
+
+
+
+  app.post('/demo', async (req, res) => {
+  const testPayload = {
+    symbol: 'BTCUSDT',
+    side: 'buy',  // 'buy' or 'sell'
+    entryPrice: 10000,  // Example entry price
+    tp1: 101000,  // Example TP1 price
+    tp2: 102000,  // Example TP2 price
+    tp3: 103000,  // Example TP3 price
+    sl: 990000,  // Example SL price
+  };
+
+  try {
+    console.log('✅ Test webhook triggered');
+    await app._router.handle({ body: testPayload, method: 'POST' }, res);
+    res.status(200).send('Test completed successfully.');
+  } catch (err) {
+    console.error('❌ Test Error:', err);
+    res.status(500).send('Error during test execution');
+  }
+});
+
+
+  app.get('/test', async (req, res) => {
+
+  try {
+    console.log('✅ Test webhook triggered');
+  const testPayload = JSON.stringify({  symbol: 'BTCUSDT',
+    side: 'buy',  // 'buy' or 'sell'
+    entryPrice: 10000,  // Example entry price
+    tp1: 101000,  // Example TP1 price
+    tp2: 102000,  // Example TP2 price
+    tp3: 103000,  // Example TP3 price
+    sl: 990000 });
+
+    res.status(200).send('Test completed successfully'+testPayload);
+  } catch (err) {
+    console.error('❌ Test Error:', err);
+    res.status(500).send('Error during test execution');
+  }
+});
 }
 
 // Track Take Profit and Stop Loss
