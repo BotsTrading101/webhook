@@ -1,0 +1,146 @@
+const axios = require('axios');
+const { RestClientV5 } = require('bybit-api');
+
+// Initialize Bybit client with API keys from the environment variables
+const client = new RestClientV5({
+  key: process.env.BYBIT_API_KEY,
+  secret: process.env.BYBIT_API_SECRET,
+  demoTrading: true, // Use testnet for demo trading
+  demoTradingUrl: 'https://api-demo.bybit.com', // Bybit demo API URL
+});
+
+// Send a message to Telegram
+async function sendToTelegram(message) {
+  try {
+    const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    await axios.post(url, {
+      chat_id: process.env.TELEGRAM_CHAT_ID,
+      text: message,
+    });
+    console.log('Message sent to Telegram');
+  } catch (error) {
+    console.error('Error sending message to Telegram:', error);
+  }
+}
+
+// Function to start the webhook server and handle incoming trade signals
+function startWebhookServer(app) {
+  app.post('/webhook', async (req, res) => {
+    const { symbol, side, entryPrice, tp1, tp2, tp3, sl } = req.body;
+
+    // Log incoming data for debugging
+    console.log('Received webhook:', req.body);
+
+    try {
+      // Step 1: Place order
+      const orderRes = await client.submitOrder({
+        category: 'linear',
+        symbol,
+        side: side.toUpperCase(),
+        orderType: 'Market',
+        qty: '0.01', // Example quantity
+        timeInForce: 'GoodTillCancel',
+      });
+
+      const orderId = orderRes.result.orderId;
+      console.log(`Order placed with ID: ${orderId}`);
+
+      // Step 2: Confirm order fill (wait until position is filled)
+      let positionFilled = false;
+      let positionSize = 0;
+
+      while (!positionFilled) {
+        const orderStatusRes = await client.getOrder({ symbol, orderId });
+        positionSize = parseFloat(orderStatusRes.result.size);
+
+        if (positionSize > 0) {
+          positionFilled = true;
+          console.log('Order filled:', positionSize);
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait for 5 seconds before checking again
+        }
+      }
+
+      // Step 3: Track TP and SL levels
+      await trackTakeProfit(symbol, side, entryPrice, tp1, tp2, tp3, sl);
+
+      res.status(200).send('Trade processed successfully.');
+    } catch (error) {
+      console.error('Error processing trade:', error);
+      await sendToTelegram('Error processing trade: ' + error.message);
+      res.status(500).send('Error processing trade.');
+    }
+  });
+}
+
+// Track Take Profit and Stop Loss
+async function trackTakeProfit(symbol, side, entryPrice, tp1, tp2, tp3, sl) {
+  let tpReached = false;
+
+  while (!tpReached) {
+    const positionRes = await client.getPositionList({ symbol, category: 'linear' });
+    const position = positionRes.result[0];
+
+    if (position && position.size > 0) {
+      const currentPrice = parseFloat(position.entryPrice);
+
+      if (side === 'buy') {
+        if (currentPrice >= tp1) {
+          await closePosition(symbol, '0.01', 'sell'); // Close position at TP1
+          await sendToTelegram(`TP1 Hit: ${entryPrice} -> ${tp1}`);
+          tpReached = true;
+        } else if (currentPrice >= tp2) {
+          await closePosition(symbol, '0.01', 'sell');
+          await sendToTelegram(`TP2 Hit: ${entryPrice} -> ${tp2}`);
+          tpReached = true;
+        } else if (currentPrice >= tp3) {
+          await closePosition(symbol, '0.01', 'sell');
+          await sendToTelegram(`TP3 Hit: ${entryPrice} -> ${tp3}`);
+          tpReached = true;
+        } else if (currentPrice <= sl) {
+          await closePosition(symbol, '0.01', 'sell');
+          await sendToTelegram(`SL Hit: ${entryPrice} -> ${sl}`);
+          tpReached = true;
+        }
+      } else if (side === 'sell') {
+        // Handle short position similarly
+
+         if (currentPrice <= tp1) {
+          await closePosition(symbol, '0.01', 'buy'); // Close position at TP1
+          await sendToTelegram(`TP1 Hit: ${entryPrice} -> ${tp1}`);
+          tpReached = true;
+        } else if (currentPrice <= tp2) {
+          await closePosition(symbol, '0.01', 'buy');
+          await sendToTelegram(`TP2 Hit: ${entryPrice} -> ${tp2}`);
+          tpReached = true;
+        } else if (currentPrice <= tp3) {
+          await closePosition(symbol, '0.01', 'buy');
+          await sendToTelegram(`TP3 Hit: ${entryPrice} -> ${tp3}`);
+          tpReached = true;
+        } else if (currentPrice >= sl) {
+          await closePosition(symbol, '0.01', 'buy');
+          await sendToTelegram(`SL Hit: ${entryPrice} -> ${sl}`);
+          tpReached = true;
+        }
+      
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait before checking again
+  }
+}
+
+// Close position
+async function closePosition(symbol, qty, side) {
+  await client.submitOrder({
+    category: 'linear',
+    symbol,
+    side: side === 'buy' ? 'Sell' : 'Buy',
+    orderType: 'Market',
+    qty,
+    timeInForce: 'GoodTillCancel',
+    reduceOnly: true,
+  });
+}
+
+module.exports = { startWebhookServer };
