@@ -2,7 +2,7 @@
   "name": "crypto-trade-bot",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "app.js",
   
 
    "scripts": {
