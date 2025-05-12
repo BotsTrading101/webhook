@@ -1,9 +1,10 @@
 const axios = require('axios');
 const { RestClientV5 } = require('bybit-api');
+require('dotenv').config(); // Load environment variables from .env file
 
 // Initialize Bybit client with API keys from the environment variables
 const client = new RestClientV5({
-  key: process.env.BYBIT_API_KEY,
+  key: process.env.BYBIT_APvvvvvvvvvvvvvvvvvI_KEY,
   secret: process.env.BYBIT_API_SECRET,
   demoTrading: true, // Use testnet for demo trading
   demoTradingUrl: 'https://api-demo.bybit.com', // Bybit demo API URL
