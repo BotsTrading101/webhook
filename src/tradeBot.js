@@ -53,7 +53,7 @@ function startWebhookServer(app) {
 
 
 while (!positionFilled) {
-  const res = await client.getPositionList({
+  const res = await client.getPositionInfo({
     category: 'linear',
     symbol: 'BTCUSDT'
   });
