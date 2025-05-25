@@ -129,7 +129,7 @@ async function trackTakeProfit(symbol, side, entryPrice, tp1, tp2, tp3, sl) {
   let tpReached = false;
 
   while (!tpReached) {
-    const positionRes = await client.getPositionList({ symbol, category: 'linear' });
+    const positionRes = await client.getPositionInfo({ symbol, category: 'linear' });
     const position = positionRes.result[0];
 
     if (position && position.size > 0) {
